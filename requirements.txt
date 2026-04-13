@@ -2,5 +2,5 @@ ccxt
 pyTelegramBotAPI
 requests
 pandas
-pandas-ta==0.3.14b0
+https://github.com/twopirllc/pandas-ta/archive/refs/tags/v0.3.14b.zip
 flask
