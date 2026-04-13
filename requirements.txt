@@ -1,5 +1,5 @@
 python-telegram-bot
 requests
 pandas
-https://github.com/twopirllc/pandas-ta/archive/refs/heads/development.zip
+pandas-ta
 flask
