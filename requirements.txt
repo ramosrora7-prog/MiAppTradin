@@ -1,4 +1,5 @@
-python-telegram-bot
+ccxt
+pyTelegramBotAPI
 requests
 pandas
 pandas-ta
