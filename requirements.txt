@@ -1,2 +1,5 @@
-pyTelegramBotAPI
-ccxt
+python-telegram-bot
+requests
+pandas
+pandas_ta
+flask
