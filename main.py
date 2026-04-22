@@ -10,16 +10,18 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot Rocío Híbrido (Cortas + Tendencias) Activo 🚀"
+    return "Bot Rocío Híbrido (Mejorado - Entradas Certeras) Activo 🚀"
 
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 # --- CONFIGURACIÓN DE SCALPING RÁPIDO ---
-SL_PERCENT = 0.008  # Stop Loss corto (0.8%) para proteger capital
-TP_PERCENT = 0.012  # Ganancia rápida (1.2%) para sumar de a poco
+SL_PERCENT = 0.008  # Stop Loss (0.8%)
+TP_PERCENT = 0.012  # Take Profit (1.2%)
 
+# Diccionario para rastrear el estado y el RSI anterior
 last_alert_state = {'BTC/USDT': None, 'ETH/USDT': None, 'SOL/USDT': None, 'ZEC/USDT': None, 'XRP/USDT': None}
+last_rsi_value = {'BTC/USDT': 50.0, 'ETH/USDT': 50.0, 'SOL/USDT': 50.0, 'ZEC/USDT': 50.0, 'XRP/USDT': 50.0}
 
 def enviar_telegram(mensaje):
     if TOKEN and CHAT_ID:
@@ -42,10 +44,10 @@ def calcular_indicadores(precios):
     return rsi.iloc[-1], ema.iloc[-1]
 
 def trading_loop():
-    print("Bot Híbrido Iniciado...", flush=True)
-    enviar_telegram("⚡ *Bot Rocío Modo Guerrero Activo*\nDetectando rebotes cortos y tendencias al mismo tiempo.")
+    print("Bot Híbrido Iniciado con Filtro de Giro...", flush=True)
+    enviar_telegram("⚡ *Bot Rocío Modo Guerrero V2*\nFiltro de confirmación activado para evitar caídas falsas.")
     
-    exchange = ccxt.mexc()
+    exchange = ccxt.mexc() # O el exchange que prefieras
     watchlist = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'ZEC/USDT', 'XRP/USDT']
 
     while True:
@@ -54,49 +56,52 @@ def trading_loop():
                 bars = exchange.fetch_ohlcv(moneda, timeframe='5m', limit=250)
                 precios = [b[4] for b in bars]
                 precio_actual = precios[-1]
-                rsi, ema = calcular_indicadores(precios)
+                rsi_actual, ema = calcular_indicadores(precios)
                 
+                # Recuperamos el RSI de la vuelta anterior para comparar
+                rsi_previo = last_rsi_value[moneda]
                 es_alcista = precio_actual > ema
-                distancia_ema = ((precio_actual - ema) / ema) * 100
 
-                # --- LÓGICA DE SEÑALES ---
+                # --- MEJORA: LÓGICA DE CONFIRMACIÓN DE GIRO ---
                 
-                # LONG (RSI bajo)
-                if rsi < 35 and last_alert_state[moneda] != 'long':
-                    # Verifica si además es tendencia
-                    contexto = "🔥 TENDENCIA + REBOTE" if es_alcista else "❄️ REBOTE (Contra tendencia)"
+                # LONG: RSI estaba abajo ( < 35) Y AHORA está subiendo
+                if rsi_actual < 35 and rsi_actual > rsi_previo and last_alert_state[moneda] != 'long':
+                    contexto = "✅ REBOTE CONFIRMADO" if es_alcista else "⚠️ REBOTE (Contra tendencia)"
                     sl = precio_actual * (1 - SL_PERCENT)
                     tp = precio_actual * (1 + TP_PERCENT)
                     
                     msg = (f"🔵 *¡SEÑAL DE COMPRA!* ({moneda})\n"
                            f"━━━━━━━━━━━━━━━\n"
-                           f"📢 *Tipo:* {contexto}\n"
-                           f"📉 *RSI:* {rsi:.2f} | *EMA 200:* ${ema:,.2f}\n"
-                           f"💵 *Entrada:* ${precio_actual:,.2f}\n"
-                           f"🎯 *TP:* ${tp:,.2f} | 🛑 *SL:* ${sl:,.2f}")
+                           f"📢 *Confirmación:* RSI girando al alza ({rsi_previo:.1f} ➔ {rsi_actual:.1f})\n"
+                           f"💵 *Entrada:* ${precio_actual:,.4f}\n"
+                           f"🎯 *TP:* ${tp:,.4f} | 🛑 *SL:* ${sl:,.4f}")
                     enviar_telegram(msg)
                     last_alert_state[moneda] = 'long'
 
-                # SHORT (RSI alto)
-                elif rsi > 65 and last_alert_state[moneda] != 'short':
-                    contexto = "🔥 TENDENCIA + CAÍDA" if not es_alcista else "❄️ CAÍDA (Contra tendencia)"
+                # SHORT: RSI estaba arriba ( > 65) Y AHORA está bajando
+                elif rsi_actual > 65 and rsi_actual < rsi_previo and last_alert_state[moneda] != 'short':
+                    contexto = "✅ CAÍDA CONFIRMADA" if not es_alcista else "⚠️ CAÍDA (Contra tendencia)"
                     sl = precio_actual * (1 + SL_PERCENT)
                     tp = precio_actual * (1 - TP_PERCENT)
                     
                     msg = (f"🔴 *¡SEÑAL DE VENTA!* ({moneda})\n"
                            f"━━━━━━━━━━━━━━━\n"
-                           f"📢 *Tipo:* {contexto}\n"
-                           f"📈 *RSI:* {rsi:.2f} | *EMA 200:* ${ema:,.2f}\n"
-                           f"💵 *Entrada:* ${precio_actual:,.2f}\n"
-                           f"🎯 *TP:* ${tp:,.2f} | 🛑 *SL:* ${sl:,.2f}")
+                           f"📢 *Confirmación:* RSI girando a la baja ({rsi_previo:.1f} ➔ {rsi_actual:.1f})\n"
+                           f"💵 *Entrada:* ${precio_actual:,.4f}\n"
+                           f"🎯 *TP:* ${tp:,.4f} | 🛑 *SL:* ${sl:,.4f}")
                     enviar_telegram(msg)
                     last_alert_state[moneda] = 'short'
                 
-                elif 42 < rsi < 48:
+                # Resetear alertas cuando el RSI vuelve a zona neutral
+                elif 45 < rsi_actual < 55:
                     last_alert_state[moneda] = None
+                
+                # Guardar el RSI actual para la próxima comparación
+                last_rsi_value[moneda] = rsi_actual
             
             time.sleep(60)
         except Exception as e:
+            print(f"Error: {e}")
             time.sleep(10)
 
 if __name__ == "__main__":
@@ -105,3 +110,4 @@ if __name__ == "__main__":
     t.start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
+                         
