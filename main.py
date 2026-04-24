@@ -10,9 +10,9 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "OK" # Mantiene cron-job feliz
+    return "OK" # Mantenemos la conexión estable con cron-job
 
-# --- CONFIGURACIÓN OPTIMIZADA PARA MÁS ALERTAS ---
+# --- CONFIGURACIÓN HÍBRIDA (ALERTAS CONSTANTES) ---
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
@@ -42,8 +42,8 @@ def calcular_indicadores(precios):
     return rsi.iloc[-1], ema.iloc[-1]
 
 def trading_loop():
-    print("Bot V3.3 (Más Alertas) Iniciado...", flush=True)
-    enviar_telegram("🔥 *Bot Rocío V3.3 Activo*\nFiltros ajustados para detectar más oportunidades.")
+    print("Bot V3.5 Híbrido Iniciado...", flush=True)
+    enviar_telegram("🚀 *Bot Rocío V3.5 Híbrido Activo*\nDetectando tendencias y operaciones cortas 24/7.")
     
     exchange = ccxt.mexc()
     watchlist = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'ZEC/USDT', 'XRP/USDT']
@@ -57,35 +57,39 @@ def trading_loop():
                 rsi_actual, ema = calcular_indicadores(precios)
                 rsi_previo = last_rsi_value[moneda]
                 
-                es_alcista = precio_actual > ema
                 giro_rsi = rsi_actual - rsi_previo
-
-                # --- COMPRA (Más sensible: RSI < 35 y Giro > 0.6) ---
-                if rsi_actual < 35 and giro_rsi > 0.6 and es_alcista and last_alert_state[moneda] != 'long':
-                    sl = precio_actual * (1 - SL_PERCENT)
-                    tp = precio_actual * (1 + TP_PERCENT)
-                    msg = (f"🔵 *SEÑAL DE COMPRA*\n"
+                es_alcista = precio_actual > ema
+                
+                # --- LÓGICA DE ALERTA ---
+                # Compra: RSI bajo (< 38) y subiendo (+0.4)
+                if rsi_actual < 38 and giro_rsi > 0.4 and last_alert_state[moneda] != 'long':
+                    tipo = "🟢 FAVOR DE TENDENCIA" if es_alcista else "⚠️ CONTRA TENDENCIA (Corta)"
+                    msg = (f"🔵 *NUEVA COMPRA*\n"
+                           f"━━━━━━━━━━━━━━━\n"
                            f"🪙 *Moneda:* {moneda}\n"
-                           f"📈 *Trend:* ALCISTA\n"
-                           f"⚡ *Giro RSI:* +{giro_rsi:.2f}\n"
-                           f"💵 *Entrada:* ${precio_actual:,.4f}")
+                           f"📊 *Tipo:* {tipo}\n"
+                           f"📈 *Trend:* {'ALCISTA' if es_alcista else 'BAJISTA'}\n"
+                           f"💵 *Entrada:* ${precio_actual:,.4f}\n"
+                           f"🎯 *TP:* ${precio_actual*(1+TP_PERCENT):,.4f}\n"
+                           f"🛑 *SL:* ${precio_actual*(1-SL_PERCENT):,.4f}")
                     enviar_telegram(msg)
                     last_alert_state[moneda] = 'long'
 
-                # --- VENTA (Más sensible: RSI > 65 y Giro < -0.6) ---
-                elif rsi_actual > 65 and giro_rsi < -0.6 and not es_alcista and last_alert_state[moneda] != 'short':
-                    sl = precio_actual * (1 + SL_PERCENT)
-                    tp = precio_actual * (1 - TP_PERCENT)
-                    msg = (f"🔴 *SEÑAL DE VENTA*\n"
+                # Venta: RSI alto (> 62) y bajando (-0.4)
+                elif rsi_actual > 62 and giro_rsi < -0.4 and last_alert_state[moneda] != 'short':
+                    tipo = "🟢 FAVOR DE TENDENCIA" if not es_alcista else "⚠️ CONTRA TENDENCIA (Corta)"
+                    msg = (f"🔴 *NUEVA VENTA*\n"
+                           f"━━━━━━━━━━━━━━━\n"
                            f"🪙 *Moneda:* {moneda}\n"
-                           f"📉 *Trend:* BAJISTA\n"
-                           f"⚡ *Giro RSI:* {giro_rsi:.2f}\n"
-                           f"💵 *Entrada:* ${precio_actual:,.4f}")
+                           f"📊 *Tipo:* {tipo}\n"
+                           f"📉 *Trend:* {'ALCISTA' if es_alcista else 'BAJISTA'}\n"
+                           f"💵 *Entrada:* ${precio_actual:,.4f}\n"
+                           f"🎯 *TP:* ${precio_actual*(1-TP_PERCENT):,.4f}\n"
+                           f"🛑 *SL:* ${precio_actual*(1+SL_PERCENT):,.4f}")
                     enviar_telegram(msg)
                     last_alert_state[moneda] = 'short'
                 
-                # Reseteo más rápido para permitir nuevas señales pronto
-                elif 42 < rsi_actual < 58:
+                elif 45 < rsi_actual < 55:
                     last_alert_state[moneda] = None
                 
                 last_rsi_value[moneda] = rsi_actual
