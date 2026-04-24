@@ -10,17 +10,15 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    # Respuesta ligera para que cron-job.org no falle y el bot no se duerma
-    return "OK"
+    return "OK" # Mantiene cron-job feliz
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACIÓN OPTIMIZADA PARA MÁS ALERTAS ---
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-SL_PERCENT = 0.008  # Stop Loss (0.8%)
-TP_PERCENT = 0.012  # Take Profit (1.2%)
+SL_PERCENT = 0.008  
+TP_PERCENT = 0.012  
 
-# Seguimiento de estados para evitar alertas repetidas
 last_alert_state = {'BTC/USDT': None, 'ETH/USDT': None, 'SOL/USDT': None, 'ZEC/USDT': None, 'XRP/USDT': None}
 last_rsi_value = {'BTC/USDT': 50.0, 'ETH/USDT': 50.0, 'SOL/USDT': 50.0, 'ZEC/USDT': 50.0, 'XRP/USDT': 50.0}
 
@@ -28,14 +26,11 @@ def enviar_telegram(mensaje):
     if TOKEN and CHAT_ID:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
         payload = {"chat_id": CHAT_ID, "text": mensaje, "parse_mode": "Markdown"}
-        try:
-            requests.post(url, json=payload)
-        except:
-            pass
+        try: requests.post(url, json=payload)
+        except: pass
 
 def calcular_indicadores(precios):
     df = pd.DataFrame(precios, columns=['close'])
-    # Cálculo de RSI
     delta = df['close'].diff()
     gain = (delta.where(delta > 0, 0))
     loss = (-delta.where(delta < 0, 0))
@@ -43,13 +38,12 @@ def calcular_indicadores(precios):
     avg_loss = loss.ewm(alpha=1/14, min_periods=14).mean()
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
-    # Cálculo de EMA 200 para determinar tendencia
     ema = df['close'].ewm(span=200, adjust=False).mean()
     return rsi.iloc[-1], ema.iloc[-1]
 
 def trading_loop():
-    print("Bot V3.2 Iniciado...", flush=True)
-    enviar_telegram("🎯 *Bot Rocío V3.2 Activo*\nSistema de estabilidad y aviso de tendencia configurado.")
+    print("Bot V3.3 (Más Alertas) Iniciado...", flush=True)
+    enviar_telegram("🔥 *Bot Rocío V3.3 Activo*\nFiltros ajustados para detectar más oportunidades.")
     
     exchange = ccxt.mexc()
     watchlist = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'ZEC/USDT', 'XRP/USDT']
@@ -57,63 +51,51 @@ def trading_loop():
     while True:
         try:
             for moneda in watchlist:
-                # Velas de 5 minutos
                 bars = exchange.fetch_ohlcv(moneda, timeframe='5m', limit=250)
                 precios = [b[4] for b in bars]
                 precio_actual = precios[-1]
-                
                 rsi_actual, ema = calcular_indicadores(precios)
                 rsi_previo = last_rsi_value[moneda]
                 
                 es_alcista = precio_actual > ema
                 giro_rsi = rsi_actual - rsi_previo
 
-                # --- LÓGICA DE COMPRA ---
-                if rsi_actual < 30 and giro_rsi > 1.0 and es_alcista and last_alert_state[moneda] != 'long':
+                # --- COMPRA (Más sensible: RSI < 35 y Giro > 0.6) ---
+                if rsi_actual < 35 and giro_rsi > 0.6 and es_alcista and last_alert_state[moneda] != 'long':
                     sl = precio_actual * (1 - SL_PERCENT)
                     tp = precio_actual * (1 + TP_PERCENT)
-                    
                     msg = (f"🔵 *SEÑAL DE COMPRA*\n"
-                           f"━━━━━━━━━━━━━━━\n"
                            f"🪙 *Moneda:* {moneda}\n"
-                           f"📈 *Tendencia:* ALCISTA (Precio > EMA 200)\n"
-                           f"⚡ *Confirmación:* RSI girando +{giro_rsi:.1f}\n"
-                           f"💵 *Entrada:* ${precio_actual:,.4f}\n"
-                           f"🎯 *TP:* ${tp:,.4f} | 🛑 *SL:* ${sl:,.4f}")
+                           f"📈 *Trend:* ALCISTA\n"
+                           f"⚡ *Giro RSI:* +{giro_rsi:.2f}\n"
+                           f"💵 *Entrada:* ${precio_actual:,.4f}")
                     enviar_telegram(msg)
                     last_alert_state[moneda] = 'long'
 
-                # --- LÓGICA DE VENTA ---
-                elif rsi_actual > 70 and giro_rsi < -1.0 and not es_alcista and last_alert_state[moneda] != 'short':
+                # --- VENTA (Más sensible: RSI > 65 y Giro < -0.6) ---
+                elif rsi_actual > 65 and giro_rsi < -0.6 and not es_alcista and last_alert_state[moneda] != 'short':
                     sl = precio_actual * (1 + SL_PERCENT)
                     tp = precio_actual * (1 - TP_PERCENT)
-                    
                     msg = (f"🔴 *SEÑAL DE VENTA*\n"
-                           f"━━━━━━━━━━━━━━━\n"
                            f"🪙 *Moneda:* {moneda}\n"
-                           f"📉 *Tendencia:* BAJISTA (Precio < EMA 200)\n"
-                           f"⚡ *Confirmación:* RSI cayendo {giro_rsi:.1f}\n"
-                           f"💵 *Entrada:* ${precio_actual:,.4f}\n"
-                           f"🎯 *TP:* ${tp:,.4f} | 🛑 *SL:* ${sl:,.4f}")
+                           f"📉 *Trend:* BAJISTA\n"
+                           f"⚡ *Giro RSI:* {giro_rsi:.2f}\n"
+                           f"💵 *Entrada:* ${precio_actual:,.4f}")
                     enviar_telegram(msg)
                     last_alert_state[moneda] = 'short'
                 
-                # Resetear para permitir nueva señal cuando el RSI se normalice
-                elif 45 < rsi_actual < 55:
+                # Reseteo más rápido para permitir nuevas señales pronto
+                elif 42 < rsi_actual < 58:
                     last_alert_state[moneda] = None
                 
                 last_rsi_value[moneda] = rsi_actual
-            
             time.sleep(60)
-            
         except Exception as e:
-            print(f"Error: {e}")
             time.sleep(10)
 
 if __name__ == "__main__":
     t = threading.Thread(target=trading_loop)
     t.daemon = True
     t.start()
-    
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
