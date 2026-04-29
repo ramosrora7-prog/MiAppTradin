@@ -12,15 +12,15 @@ app = Flask(__name__)
 def home():
     return "OK"
 
-# --- CONFIGURACIÓN ULTRA-SENSIBLE V3.9 ---
+# --- CONFIGURACIÓN CON ADA INCLUIDA ---
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-SL_PERCENT = 0.008  # 0.8%
-TP_PERCENT = 0.012  # 1.2%
+SL_PERCENT = 0.008  
+TP_PERCENT = 0.012  
 
-# Monedas con mucho movimiento para asegurar alertas
-watchlist = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT', 'DOGE/USDT']
+# Lista actualizada: Ahora vigilamos 6 monedas
+watchlist = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT', 'DOGE/USDT', 'ADA/USDT']
 last_alert_state = {m: None for m in watchlist}
 last_rsi_value = {m: 50.0 for m in watchlist}
 
@@ -44,15 +44,14 @@ def calcular_indicadores(precios):
     return rsi.iloc[-1], ema.iloc[-1]
 
 def trading_loop():
-    print("🚀 Lanzando Versión 3.9 Ultra-Sensible...", flush=True)
-    enviar_telegram("⚡ *Bot Rocío V3.9 ACTIVO*\nModo Ultra-Sensible activado. Escaneando cada 30s.")
+    print("🚀 Iniciando V3.9.1 con ADA...", flush=True)
+    enviar_telegram("✅ *Bot Rocío V3.9.1 Actualizado*\nMoneda agregada: *ADA/USDT*. Escaneando 6 activos.")
     
     exchange = ccxt.mexc({'timeout': 30000, 'enableRateLimit': True})
 
     while True:
         try:
             for moneda in watchlist:
-                # Obtenemos velas de 5 min
                 bars = exchange.fetch_ohlcv(moneda, timeframe='5m', limit=100)
                 precios = [b[4] for b in bars]
                 precio_actual = precios[-1]
@@ -62,38 +61,35 @@ def trading_loop():
                 giro_rsi = rsi_actual - rsi_previo
                 es_alcista = precio_actual > ema
                 
-                # --- LÓGICA DE ENTRADA RÁPIDA ---
-                # COMPRA: RSI < 42 y subiendo levemente
+                # --- LÓGICA DE COMPRA ---
                 if rsi_actual < 42 and giro_rsi > 0.2 and last_alert_state[moneda] != 'long':
                     msg = (f"🔵 *COMPRA DETECTADA*\n"
                            f"🪙 {moneda}\n"
                            f"📊 Trend: {'ALCISTA' if es_alcista else 'BAJISTA (Rebote)'}\n"
-                           f"⚡ RSI: {rsi_actual:.1f} | Giro: +{giro_rsi:.2f}\n"
+                           f"⚡ RSI: {rsi_actual:.1f}\n"
                            f"💵 Entrada: ${precio_actual:,.4f}\n"
                            f"🎯 TP: ${precio_actual*(1+TP_PERCENT):,.4f} | 🛑 SL: ${precio_actual*(1-SL_PERCENT):,.4f}")
                     enviar_telegram(msg)
                     last_alert_state[moneda] = 'long'
 
-                # VENTA: RSI > 58 y bajando levemente
+                # --- LÓGICA DE VENTA ---
                 elif rsi_actual > 58 and giro_rsi < -0.2 and last_alert_state[moneda] != 'short':
                     msg = (f"🔴 *VENTA DETECTADA*\n"
                            f"🪙 {moneda}\n"
                            f"📊 Trend: {'BAJISTA' if not es_alcista else 'ALCISTA (Rebote)'}\n"
-                           f"⚡ RSI: {rsi_actual:.1f} | Giro: {giro_rsi:.2f}\n"
+                           f"⚡ RSI: {rsi_actual:.1f}\n"
                            f"💵 Entrada: ${precio_actual:,.4f}\n"
                            f"🎯 TP: ${precio_actual*(1-TP_PERCENT):,.4f} | 🛑 SL: ${precio_actual*(1+SL_PERCENT):,.4f}")
                     enviar_telegram(msg)
                     last_alert_state[moneda] = 'short'
                 
-                # Reset para estar listos para la siguiente señal
                 elif 47 < rsi_actual < 53:
                     last_alert_state[moneda] = None
                 
                 last_rsi_value[moneda] = rsi_actual
             
-            time.sleep(30) # Rapidez total
+            time.sleep(30)
         except Exception as e:
-            print(f"Error: {e}")
             time.sleep(20)
 
 if __name__ == "__main__":
