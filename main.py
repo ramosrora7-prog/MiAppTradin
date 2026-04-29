@@ -12,15 +12,14 @@ app = Flask(__name__)
 def home():
     return "OK"
 
-# --- CONFIGURACIÓN FLASH SCALPER V4.0 ---
+# --- CONFIGURACIÓN MATEMÁTICA V4.1 ---
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# Parámetros para cierres rápidos en scalping de 5 min
-SL_PERCENT = 0.008  # 0.8%
-TP_PERCENT = 0.012  # 1.2%
+# Gestión de riesgo estricta para cuenta de $25
+SL_PERCENT = 0.008  
+TP_PERCENT = 0.012  
 
-# Lista de monedas a vigilar (Incluye ADA)
 watchlist = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT', 'DOGE/USDT', 'ADA/USDT']
 last_alert_state = {m: None for m in watchlist}
 last_rsi_value = {m: 50.0 for m in watchlist}
@@ -29,10 +28,8 @@ def enviar_telegram(mensaje):
     if TOKEN and CHAT_ID:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
         payload = {"chat_id": CHAT_ID, "text": mensaje, "parse_mode": "Markdown"}
-        try:
-            requests.post(url, json=payload, timeout=10)
-        except:
-            pass
+        try: requests.post(url, json=payload, timeout=10)
+        except: pass
 
 def calcular_indicadores(precios):
     df = pd.DataFrame(precios, columns=['close'])
@@ -47,17 +44,15 @@ def calcular_indicadores(precios):
     return rsi.iloc[-1], ema.iloc[-1]
 
 def trading_loop():
-    print("🚀 Lanzando V4.0 Flash Scalper...", flush=True)
-    enviar_telegram("⚡ *MODO FLASH V4.0 ACTIVO*\nFiltros al máximo para detectar movimientos mínimos.")
+    print("🤖 Modo Matemática Pura V4.1...", flush=True)
+    enviar_telegram("📊 *V4.1: SISTEMA MATEMÁTICO ACTIVO*\nConexión estable. Vigilando 6 activos en 5m.")
     
-    # Conectamos con el exchange
     exchange = ccxt.mexc({'timeout': 30000, 'enableRateLimit': True})
 
     while True:
         try:
             for moneda in watchlist:
-                # Velas de 5 minutos
-                bars = exchange.fetch_ohlcv(moneda, timeframe='5m', limit=100)
+                bars = exchange.fetch_ohlcv(moneda, timeframe='5m', limit=150)
                 precios = [b[4] for b in bars]
                 precio_actual = precios[-1]
                 rsi_actual, ema = calcular_indicadores(precios)
@@ -66,42 +61,41 @@ def trading_loop():
                 giro_rsi = rsi_actual - rsi_previo
                 es_alcista = precio_actual > ema
                 
-                # --- COMPRA FLASH (RSI < 45) ---
-                if rsi_actual < 45 and giro_rsi > 0.1 and last_alert_state[moneda] != 'long':
-                    msg = (f"🔵 *COMPRA RÁPIDA*\n"
+                # --- LÓGICA MATEMÁTICA SIN EMOCIONES ---
+                # COMPRA: RSI bajo con giro fuerte de recuperación
+                if rsi_actual < 44 and giro_rsi > 0.25 and last_alert_state[moneda] != 'long':
+                    estado = "🛡️ FAVOR DE TENDENCIA" if es_alcista else "⚠️ REBOTE CORTO"
+                    msg = (f"🔵 *SEÑAL DE COMPRA*\n"
                            f"━━━━━━━━━━━━━━━\n"
                            f"🪙 *Moneda:* {moneda}\n"
-                           f"📈 *Trend:* {'ALCISTA' if es_alcista else 'BAJISTA (Rebote)'}\n"
-                           f"⚡ *RSI:* {rsi_actual:.1f} | *Giro:* +{giro_rsi:.2f}\n"
-                           f"💵 *Precio:* ${precio_actual:,.4f}\n"
+                           f"📊 *Tipo:* {estado}\n"
+                           f"💵 *Entrada:* ${precio_actual:,.4f}\n"
                            f"🎯 *TP:* ${precio_actual*(1+TP_PERCENT):,.4f}\n"
                            f"🛑 *SL:* ${precio_actual*(1-SL_PERCENT):,.4f}")
                     enviar_telegram(msg)
                     last_alert_state[moneda] = 'long'
 
-                # --- VENTA FLASH (RSI > 55) ---
-                elif rsi_actual > 55 and giro_rsi < -0.1 and last_alert_state[moneda] != 'short':
-                    msg = (f"🔴 *VENTA RÁPIDA*\n"
+                # VENTA: RSI alto con giro de agotamiento
+                elif rsi_actual > 56 and giro_rsi < -0.25 and last_alert_state[moneda] != 'short':
+                    estado = "🛡️ FAVOR DE TENDENCIA" if not es_alcista else "⚠️ REBOTE CORTO"
+                    msg = (f"🔴 *SEÑAL DE VENTA*\n"
                            f"━━━━━━━━━━━━━━━\n"
                            f"🪙 *Moneda:* {moneda}\n"
-                           f"📉 *Trend:* {'BAJISTA' if not es_alcista else 'ALCISTA (Rebote)'}\n"
-                           f"⚡ *RSI:* {rsi_actual:.1f} | *Giro:* {giro_rsi:.2f}\n"
-                           f"💵 *Precio:* ${precio_actual:,.4f}\n"
+                           f"📊 *Tipo:* {estado}\n"
+                           f"💵 *Entrada:* ${precio_actual:,.4f}\n"
                            f"🎯 *TP:* ${precio_actual*(1-TP_PERCENT):,.4f}\n"
                            f"🛑 *SL:* ${precio_actual*(1+SL_PERCENT):,.4f}")
                     enviar_telegram(msg)
                     last_alert_state[moneda] = 'short'
                 
-                # Reseteo del estado para permitir nuevas señales
-                elif 49 < rsi_actual < 51:
+                elif 48 < rsi_actual < 52:
                     last_alert_state[moneda] = None
                 
                 last_rsi_value[moneda] = rsi_actual
             
-            # Escaneo cada 20 segundos
-            time.sleep(20)
+            time.sleep(30) 
         except Exception as e:
-            time.sleep(10)
+            time.sleep(20)
 
 if __name__ == "__main__":
     t = threading.Thread(target=trading_loop)
